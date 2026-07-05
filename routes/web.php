@@ -3,12 +3,30 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
+$tableExists = function (string $table): bool {
+    try {
+        return Schema::hasTable($table);
+    } catch (Throwable $exception) {
+        Log::warning("Could not inspect database table [{$table}].", [
+            'exception' => $exception::class,
+            'message' => $exception->getMessage(),
+        ]);
+
+        return false;
+    }
+};
+
+$siteSettings = fn (): array => $tableExists('site_settings')
+    ? DB::table('site_settings')->orderBy('key')->pluck('value', 'key')->all()
+    : [];
+
 if (config('app.debug')) {
-    Route::get('/debug-db', function () {
+    Route::get('/debug-db', function () use ($tableExists) {
         try {
             $version = DB::selectOne('select version() as version');
 
@@ -19,9 +37,9 @@ if (config('app.debug')) {
                 'port' => config('database.connections.mysql.port'),
                 'version' => $version?->version,
                 'tables' => [
-                    'users' => Schema::hasTable('users'),
-                    'documents' => Schema::hasTable('documents'),
-                    'site_settings' => Schema::hasTable('site_settings'),
+                    'users' => $tableExists('users'),
+                    'documents' => $tableExists('documents'),
+                    'site_settings' => $tableExists('site_settings'),
                 ],
             ]);
         } catch (Throwable $exception) {
@@ -33,12 +51,6 @@ if (config('app.debug')) {
     });
 }
 
-$siteSettings = fn (): array => DB::table('site_settings')
-    ->when(Schema::hasTable('site_settings'), fn ($query) => $query->orderBy('key'))
-    ->when(! Schema::hasTable('site_settings'), fn () => collect())
-    ->pluck('value', 'key')
-    ->all();
-
 $eventResource = fn (object $item): array => [
     'id' => $item->id,
     'title' => $item->title,
@@ -48,10 +60,10 @@ $eventResource = fn (object $item): array => [
     'image' => $item->image_url,
 ];
 
-Route::get('/', function () use ($siteSettings, $eventResource) {
+Route::get('/', function () use ($siteSettings, $eventResource, $tableExists) {
     return Inertia::render('Portal/Home', [
         'settings' => $siteSettings(),
-        'featuredNews' => Schema::hasTable('news')
+        'featuredNews' => $tableExists('news')
             ? DB::table('news')
                 ->where('is_published', true)
                 ->orderByDesc('is_featured')
@@ -67,7 +79,7 @@ Route::get('/', function () use ($siteSettings, $eventResource) {
                     'date' => $item->published_at,
                 ])
             : collect(),
-        'events' => Schema::hasTable('events')
+        'events' => $tableExists('events')
             ? DB::table('events')
                 ->where('is_published', true)
                 ->orderBy('event_date')
@@ -76,7 +88,7 @@ Route::get('/', function () use ($siteSettings, $eventResource) {
                 ->get()
                 ->map($eventResource)
             : collect(),
-        'offices' => Schema::hasTable('offices')
+        'offices' => $tableExists('offices')
             ? DB::table('offices')
                 ->where('is_active', true)
                 ->orderBy('sort_order')
@@ -86,10 +98,10 @@ Route::get('/', function () use ($siteSettings, $eventResource) {
     ]);
 })->name('home');
 
-Route::get('/nosotros', function () use ($siteSettings) {
+Route::get('/nosotros', function () use ($siteSettings, $tableExists) {
     return Inertia::render('Portal/About', [
         'settings' => $siteSettings(),
-        'sections' => Schema::hasTable('institutional_sections')
+        'sections' => $tableExists('institutional_sections')
             ? DB::table('institutional_sections')
                 ->where('is_active', true)
                 ->orderBy('sort_order')
@@ -99,14 +111,14 @@ Route::get('/nosotros', function () use ($siteSettings) {
     ]);
 })->name('about');
 
-Route::get('/documentos', function (Request $request) use ($siteSettings) {
+Route::get('/documentos', function (Request $request) use ($siteSettings, $tableExists) {
     $page = max(1, (int) $request->integer('page', 1));
     $pageSize = 4;
     $search = trim((string) $request->input('search', ''));
     $categories = $request->input('category', []);
     $categories = is_array($categories) ? array_values(array_filter($categories)) : [$categories];
 
-    if (! Schema::hasTable('documents') || ! Schema::hasTable('document_categories')) {
+    if (! $tableExists('documents') || ! $tableExists('document_categories')) {
         return Inertia::render('Portal/Documents', [
             'settings' => $siteSettings(),
             'categories' => collect(),
@@ -182,11 +194,11 @@ Route::get('/documentos', function (Request $request) use ($siteSettings) {
     ]);
 })->name('documents');
 
-Route::get('/eventos', function (Request $request) use ($siteSettings, $eventResource) {
+Route::get('/eventos', function (Request $request) use ($siteSettings, $eventResource, $tableExists) {
     $page = max(1, (int) $request->integer('page', 1));
     $pageSize = 6;
 
-    if (! Schema::hasTable('events')) {
+    if (! $tableExists('events')) {
         return Inertia::render('Portal/Events', [
             'settings' => $siteSettings(),
             'events' => [
