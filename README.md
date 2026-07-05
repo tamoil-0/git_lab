@@ -116,6 +116,32 @@ root /var/www/psec/public;
 index index.php;
 ```
 
+## Deploy en Vercel
+
+El proyecto incluye `vercel.json` para ejecutar Laravel con `vercel-php` y compilar los assets de Vite durante el despliegue.
+
+Configura estas variables en Vercel, en `Project Settings > Environment Variables`:
+
+```env
+APP_NAME="Proyeccion Social UNAP"
+APP_ENV=production
+APP_DEBUG=false
+APP_KEY=base64:...
+APP_URL=https://tu-dominio.vercel.app
+LOG_CHANNEL=stderr
+CACHE_STORE=array
+SESSION_DRIVER=cookie
+QUEUE_CONNECTION=sync
+```
+
+Genera `APP_KEY` localmente con:
+
+```bash
+php artisan key:generate --show
+```
+
+Si quieres mostrar contenido desde las tablas del portal, Vercel debe conectarse a una base de datos remota. No uses `DB_HOST=127.0.0.1` en Vercel, porque apunta a la propia funcion serverless. Configura las credenciales reales de MySQL/PostgreSQL o deja las variables `DB_*` sin publicar si solo necesitas verificar que la interfaz cargue con datos de respaldo.
+
 ## Archivos sensibles
 
 No se deben versionar:
