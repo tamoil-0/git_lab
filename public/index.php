@@ -27,7 +27,9 @@ if (getenv('VERCEL')) {
         'APP_ROUTES_CACHE' => $tmpPath.'/cache/routes.php',
         'APP_SERVICES_CACHE' => $tmpPath.'/cache/services.php',
         'VIEW_COMPILED_PATH' => $tmpPath.'/views',
-        'LOG_CHANNEL' => getenv('LOG_CHANNEL') ?: 'stderr',
+        'LOG_CHANNEL' => 'stderr',
+        'LOG_STACK' => 'stderr',
+        'LOG_PATH' => $tmpPath.'/logs/laravel.log',
     ];
 
     foreach ($serverlessEnv as $key => $value) {
